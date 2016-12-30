@@ -26,27 +26,44 @@ class Hexagon {
     }
 
     private PolygonSprite createNewPolygon(Color color, Vector2 gridPos) {
-        Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pix.setColor(color);
-        pix.fill();
-        texture = new Texture(pix);
-        pix.dispose();
+        float tileSize = GameScreen.TILE_HEIGHT;
 
-        float tileWidth = GameScreen.TILE_WIDTH;
-        float tileHeight = GameScreen.TILE_HEIGHT;
+        if (color == TileType.WOOL.getColor()) {
+            texture = new Texture(Gdx.files.internal("wool.png"));
+        } else if (color == TileType.WOOD.getColor()) {
+            texture = new Texture(Gdx.files.internal("wood.png"));
+        } else if (color == TileType.STONE.getColor()) {
+            texture = new Texture(Gdx.files.internal("stone.png"));
+        } else if (color == TileType.ORE.getColor()) {
+            texture = new Texture(Gdx.files.internal("ore.png"));
+        } else if (color == TileType.WHEAT.getColor()) {
+            texture = new Texture(Gdx.files.internal("wheat.png"));
+        } else {
+            Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+            pix.setColor(color);
+            pix.fill();
+            texture = new Texture(pix);
+            pix.dispose();
+        }
+
+        float texHeight = texture.getHeight();
+        float texWidth = texHeight * ((float) Math.sqrt(3) / 2);
 
         Vector2 start = getGridCoords(gridPos);
 
         float[] vertices = {
-                start.x + tileWidth / 2, start.y,
-                start.x + tileWidth, start.y + tileHeight * .25f,
-                start.x + tileWidth, start.y + tileHeight * .75f,
-                start.x + tileWidth / 2, start.y + tileHeight,
-                start.x, start.y + tileHeight * .75f,
-                start.x, start.y + tileHeight * .25f};
+                texWidth / 2, 0,
+                texWidth, texHeight * .25f,
+                texWidth, texHeight * .75f,
+                texWidth / 2, texHeight,
+                0, texHeight * .75f,
+                0, texHeight * .25f};
 
-        PolygonRegion polyRegion = new PolygonRegion(new TextureRegion(texture), vertices, new EarClippingTriangulator().computeTriangles(vertices).toArray());
+        TextureRegion textureRegion = new TextureRegion(texture);
+        textureRegion.flip(false, true);
+        PolygonRegion polyRegion = new PolygonRegion(textureRegion, vertices, new EarClippingTriangulator().computeTriangles(vertices).toArray());
         PolygonSprite pSprite = new PolygonSprite(polyRegion);
+        pSprite.setBounds(start.x, start.y, tileSize, tileSize);
         pSprite.setOrigin(start.x + 100, start.y + 100);
         return pSprite;
     }

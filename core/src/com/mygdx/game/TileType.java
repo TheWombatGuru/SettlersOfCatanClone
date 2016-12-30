@@ -11,7 +11,7 @@ public enum TileType {
 
     WOOL (Color.GREEN),
     WOOD (Color.FOREST),
-    WEED (Color.YELLOW),
+    WHEAT (Color.YELLOW),
     ORE (Color.GRAY),
     STONE (Color.ORANGE);
 

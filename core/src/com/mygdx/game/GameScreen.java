@@ -32,7 +32,7 @@ class GameScreen implements Screen {
     private Corner hoveredCorner;
     private Road hoveredRoad;
     private static final int gridWidth = 4;
-    private static final int gridHeight = 2;
+    private static final int gridHeight = 3;
     final static int TILE_MARGIN = 3;
     private final static float WIDTH_HEIGHT_RATIO = (float) Math.sqrt(3) / 2;
     final static float TILE_WIDTH = Math.min(
@@ -44,12 +44,11 @@ class GameScreen implements Screen {
     private int playingPlayer = 0;
 
     GameScreen() {
-
         this.cam = new OrthographicCamera(800, 800);
         cam.setToOrtho(true); //If translating doesn't work anymore, add 800, 800 as 2nd and 3rd arguments
         cam.position.set(cam.viewportWidth / 2f, cam.viewportHeight / 2f, 0);
         cam.update();
-        hoveredHexagon = new Hexagon(new Color(1, 1, 1, .5f), new Vector2(0, 0));
+        hoveredHexagon = new Hexagon(new Color(1, 1, 1, .3f), new Vector2(0, 0));
         hoveredCorner = new Corner(new Vector2(0, 0), new Color(0, 0, 0, .5f), true);
         hoveredRoad = new Road(new Vector2(3, 3), new Color(0, 0, 0, .5f), true);
 
@@ -62,8 +61,6 @@ class GameScreen implements Screen {
                 tiles.add(new Hexagon(TileType.getRandomTileType().getColor(), new Vector2(x, y)));
             }
         }
-
-//        tiles.add(new Hexagon(TileType.getRandomTileType().getColor(), new Vector2(0, 0)));
 
         createCircles();
         createRoads();
@@ -93,7 +90,7 @@ class GameScreen implements Screen {
         }
 
         // Print the contents of our array to a string.  Yeah, should have used StringBuilder
-        String ipAddress = new String("");
+        String ipAddress = "";
         for(String str:addresses)
         {
             ipAddress = ipAddress + str + "\n";
@@ -113,6 +110,7 @@ class GameScreen implements Screen {
                 ServerSocket serverSocket = Gdx.net.newServerSocket(Net.Protocol.TCP, 9022, serverSocketHint);
 
                 // Loop forever
+                //noinspection InfiniteLoopStatement
                 while(true){
                     // Create a socket
                     Socket socket = serverSocket.accept(null);
