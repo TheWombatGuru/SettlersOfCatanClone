@@ -62,6 +62,8 @@ class GameScreen implements Screen {
             }
         }
 
+
+
         createCircles();
         createRoads();
 
@@ -107,7 +109,7 @@ class GameScreen implements Screen {
                 // Create the socket server using TCP protocol and listening on 9021
                 // Only one app can listen to a port at a time, keep in mind many ports are reserved
                 // especially in the lower numbers ( like 21, 80, etc )
-                ServerSocket serverSocket = Gdx.net.newServerSocket(Net.Protocol.TCP, 9022, serverSocketHint);
+                ServerSocket serverSocket = Gdx.net.newServerSocket(Net.Protocol.TCP, 9021, serverSocketHint);
 
                 // Loop forever
                 //noinspection InfiniteLoopStatement
@@ -190,13 +192,14 @@ class GameScreen implements Screen {
                         // Socket will time our in 4 seconds
                         socketHints.connectTimeout = 4000;
                         //create the socket and connect to the server entered in the text box ( x.x.x.x format ) on port 9021
-                        Socket socket = Gdx.net.newClientSocket(Net.Protocol.TCP, "127.0.0.1", 9021, socketHints);
+                        Socket socket = Gdx.net.newClientSocket(Net.Protocol.TCP, "92.110.62.170", 9021, socketHints);
                         try {
                             // write our entered message to the stream
                             socket.getOutputStream().write(textToSend.getBytes());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
+                        break;
                 }
                 return true;
             }
