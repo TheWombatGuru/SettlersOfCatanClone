@@ -1,24 +1,22 @@
 package com.mygdx.game;
 
-import com.badlogic.gdx.*;
-import com.badlogic.gdx.graphics.*;
-import com.badlogic.gdx.graphics.g2d.*;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.net.ServerSocket;
-import com.badlogic.gdx.net.ServerSocketHints;
-import com.badlogic.gdx.net.Socket;
-import com.badlogic.gdx.net.SocketHints;
+import io.socket.client.Socket;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 class GameScreen implements Screen {
 
@@ -31,145 +29,276 @@ class GameScreen implements Screen {
     private Hexagon hoveredHexagon;
     private Corner hoveredCorner;
     private Road hoveredRoad;
-    private static final int gridWidth = 4;
-    private static final int gridHeight = 3;
+    private static int gridWidth = 0;
+    private static int gridHeight = 0;
+//    private ArrayList<Player> players;
     final static int TILE_MARGIN = 3;
     private final static float WIDTH_HEIGHT_RATIO = (float) Math.sqrt(3) / 2;
-    final static float TILE_WIDTH = Math.min(
-            (ShapesGame.WIDTH - (TILE_MARGIN * ((gridHeight > 1 ? gridWidth + .5f : gridWidth) - 1))) / (gridHeight > 1 ? gridWidth + .5f : gridWidth),
-            (ShapesGame.HEIGHT - (TILE_MARGIN * (gridHeight - 1))) / (gridHeight * .75f + .25f) * WIDTH_HEIGHT_RATIO
-            );
-    final static float TILE_HEIGHT = TILE_WIDTH / WIDTH_HEIGHT_RATIO;
-    private ArrayList<Player> players;
+    static float tileWidth;
+    static float tileHeight;
     private int playingPlayer = 0;
+    private Socket socket;
+    private boolean gameStarted = false;
 
-    GameScreen() {
+    GameScreen(Socket socket) {
+        this.socket = socket;
         this.cam = new OrthographicCamera(800, 800);
-        cam.setToOrtho(true); //If translating doesn't work anymore, add 800, 800 as 2nd and 3rd arguments
+        cam.setToOrtho(true);
         cam.position.set(cam.viewportWidth / 2f, cam.viewportHeight / 2f, 0);
         cam.update();
-        hoveredHexagon = new Hexagon(new Color(1, 1, 1, .3f), new Vector2(0, 0));
+
+        hoveredHexagon = null;
+        hoveredCorner = null;
+        hoveredRoad = null;
+
+        tiles = new ArrayList<>();
+        corners = new ArrayList<>();
+        roads = new ArrayList<>();
+
+        pSB = new PolygonSpriteBatch();
+
+        handleInput();
+        handleSocketEvents();
+    }
+
+    public void createBoard(JSONObject map) throws JSONException {
+        Iterator<?> yKeysCount = map.keys();
+
+        int largestWidth = 0;
+
+        for (int i = 0; yKeysCount.hasNext(); ++i) {
+            gridHeight++;
+            String yCoord = (String) yKeysCount.next();
+            if (map.get(yCoord) instanceof JSONObject) {
+                JSONObject jsonRow = (JSONObject) map.get(yCoord);
+                Iterator<?> xKeysCount = jsonRow.keys();
+
+                int thisWidth = 0;
+
+                for (int j = 0; xKeysCount.hasNext(); ++j) {
+                    thisWidth++;
+                    xKeysCount.next();
+                }
+
+                largestWidth = Math.max(largestWidth, thisWidth);
+            }
+
+        }
+
+        gridWidth = largestWidth;
+
+        tileWidth = Math.min(
+                (ShapesGame.WIDTH - (TILE_MARGIN * ((gridHeight > 1 ? gridWidth + .5f : gridWidth) - 1))) / (gridHeight > 1 ? gridWidth + 1f : gridWidth),
+                (ShapesGame.HEIGHT - (TILE_MARGIN * (gridHeight - 1))) / (gridHeight * .75f + .25f) * WIDTH_HEIGHT_RATIO
+        );
+
+        tileHeight = tileWidth / WIDTH_HEIGHT_RATIO;
+
+        Iterator<?> yKeys = map.keys();
+
+        while (yKeys.hasNext()) {
+            String yCoord = (String) yKeys.next();
+            int y = Integer.parseInt(yCoord);
+            if (map.get(yCoord) instanceof JSONObject) {
+                JSONObject jsonRow = (JSONObject) map.get(yCoord);
+                Iterator<?> xKeys = jsonRow.keys();
+
+                while(xKeys.hasNext()) {
+                    String xCoord = (String) xKeys.next();
+                    int x = Integer.parseInt(xCoord);
+                    JSONObject cell = (JSONObject) jsonRow.get(xCoord);
+                    int tileType = (int) cell.get("tileType");
+                    int tileNumber = (int) cell.get("tileNumber");
+
+                    tiles.add(new Hexagon(TileType.getVALUES().get(tileType), new Vector2(x, y), tileNumber));
+
+                    createCircles(x, y);
+                    createRoads(x, y);
+                }
+            }
+        }
+
+        hoveredHexagon = new Hexagon(new Color(1, 1, 1, .3f), new Vector2(0, 0), 0);
         hoveredCorner = new Corner(new Vector2(0, 0), new Color(0, 0, 0, .5f), true);
         hoveredRoad = new Road(new Vector2(3, 3), new Color(0, 0, 0, .5f), true);
 
-        tiles = new ArrayList<Hexagon>();
-        corners = new ArrayList<Corner>();
-        roads = new ArrayList<Road>();
-
-        for (int y = 0; y < gridHeight; y++) {
-            for (int x = 0; x < gridWidth; x++) {
-                tiles.add(new Hexagon(TileType.getRandomTileType().getColor(), new Vector2(x, y)));
-            }
-        }
-
-
-
-        createCircles();
-        createRoads();
-
-        pSB = new PolygonSpriteBatch();
-        players = new ArrayList<Player>();
-        players.add(new Player(Color.BLUE));
-        players.add(new Player(Color.CORAL));
-        players.add(new Player(Color.RED));
-        players.add(new Player(Color.ORANGE));
-
-        handleInput();
-
-        List<String> addresses = new ArrayList<String>();
-        try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            for(NetworkInterface ni : Collections.list(interfaces)){
-                for(InetAddress address : Collections.list(ni.getInetAddresses()))
-                {
-                    if(address instanceof Inet4Address){
-                        addresses.add(address.getHostAddress());
-                    }
-                }
-            }
-        } catch (SocketException e) {
-            e.printStackTrace();
-        }
-
-        // Print the contents of our array to a string.  Yeah, should have used StringBuilder
-        String ipAddress = "";
-        for(String str:addresses)
-        {
-            ipAddress = ipAddress + str + "\n";
-        }
-
-        new Thread(new Runnable(){
-
-            @Override
-            public void run() {
-                ServerSocketHints serverSocketHint = new ServerSocketHints();
-                // 0 means no timeout.  Probably not the greatest idea in production!
-                serverSocketHint.acceptTimeout = 0;
-
-                // Create the socket server using TCP protocol and listening on 9021
-                // Only one app can listen to a port at a time, keep in mind many ports are reserved
-                // especially in the lower numbers ( like 21, 80, etc )
-                ServerSocket serverSocket = Gdx.net.newServerSocket(Net.Protocol.TCP, 9021, serverSocketHint);
-
-                // Loop forever
-                //noinspection InfiniteLoopStatement
-                while(true){
-                    // Create a socket
-                    Socket socket = serverSocket.accept(null);
-
-                    // Read data from the socket into a BufferedReader
-                    BufferedReader buffer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                    try {
-                        // Read to the next newline (\n) and display that text on labelMessage
-                        System.out.println(buffer.readLine());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }).start();
-
     }
 
-    private void createCircles() {
-        for (int y = 0; y < gridHeight * 2 + 2; y++) {
-            for (int x = 0; x < gridWidth + 1; x++) {
-                if ((x == gridWidth && y == gridHeight * 2 + 1) || x == gridWidth && y == 0) {
-                    continue;
-                }
+    private void createCircles(int x, int y) {
+        boolean c1 = false, c2 = false, c3 = false, c4 = false, c5 = false, c6 = false;
+        if (y %2 == 0) {
+            for (Corner corner : corners)
+                if (corner.getGridPos().equals(new Vector2(x, y * 2)))
+                    c1 = true;
 
-                if (y == gridHeight * 2 + 1 && gridHeight % 2 == 0) {
-                    corners.add(new Corner(new Vector2(x + 1, y), new Color(1, 0, 0, 1)));
-                } else {
-                    corners.add(new Corner(new Vector2(x, y), new Color(1, 0, 0, 1)));
-                }
-            }
+            for (Corner corner : corners)
+                if (corner.getGridPos().equals(new Vector2(x, y * 2 + 3)))
+                    c2 = true;
+
+            if (!c1)
+                corners.add(new Corner(new Vector2(x, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c2)
+                corners.add(new Corner(new Vector2(x, y * 2 + 3), new Color(1, 0, 0, 1)));
+        } else {
+            for (Corner corner : corners)
+                if (corner.getGridPos().equals(new Vector2(x + 1, y * 2)))
+                    c1 = true;
+
+            for (Corner corner : corners)
+                if (corner.getGridPos().equals(new Vector2(x + 1, y * 2 + 3)))
+                    c2 = true;
+
+            if (!c1)
+                corners.add(new Corner(new Vector2(x + 1, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c2)
+                corners.add(new Corner(new Vector2(x + 1, y * 2 + 3), new Color(1, 0, 0, 1)));
         }
+
+        for (Corner corner : corners)
+            if (corner.getGridPos().equals(new Vector2(x, y * 2 + 1)))
+                c3 = true;
+
+        for (Corner corner : corners)
+            if (corner.getGridPos().equals(new Vector2(x, y * 2 + 2)))
+                c4 = true;
+
+        for (Corner corner : corners)
+            if (corner.getGridPos().equals(new Vector2(x + 1, y * 2 + 1)))
+                c5 = true;
+
+        for (Corner corner : corners)
+            if (corner.getGridPos().equals(new Vector2(x + 1, y * 2 + 2)))
+                c6 = true;
+
+        if (!c3)
+            corners.add(new Corner(new Vector2(x, y * 2 + 1), new Color(1, 0, 0, 1)));
+
+        if (!c4)
+            corners.add(new Corner(new Vector2(x, y * 2 + 2), new Color(1, 0, 0, 1)));
+
+        if (!c5)
+            corners.add(new Corner(new Vector2(x + 1, y * 2 + 1), new Color(1, 0, 0, 1)));
+
+        if (!c6)
+            corners.add(new Corner(new Vector2(x + 1, y * 2 + 2), new Color(1, 0, 0, 1)));
     }
 
-    private void createRoads() {
-        for (int y = 0; y < gridHeight * 2 + 1; y++) {
-            for (int x = 0; x < gridWidth * 2 + 1; x++) {
-                if (y % 2 == 1 && x > gridWidth) {
-                    continue;
-                }
+    private void createRoads(int x, int  y) {
+        boolean c1 = false, c2 = false, c3 = false, c4 = false, c5 = false, c6 = false;
+        if (y %2 == 0) {
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2, y * 2)))
+                    c1 = true;
 
-                if (y == 0 && x == gridWidth * 2) {
-                    continue;
-                }
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 1, y * 2)))
+                    c2 = true;
 
-                if (y == gridHeight * 2 && x == gridWidth * 2) {
-                    continue;
-                }
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2, y * 2 + 2)))
+                    c3 = true;
 
-                if (gridHeight % 2 == 0 && y == gridHeight * 2) {
-                    roads.add(new Road(new Vector2(x + 1, y), new Color(1, 0, 0, 1)));
-                } else {
-                    roads.add(new Road(new Vector2(x, y), new Color(1, 0, 0, 1)));
-                }
-            }
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 1, y * 2 + 2)))
+                    c4 = true;
+
+            if (!c1)
+                roads.add(new Road(new Vector2(x * 2, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c2)
+                roads.add(new Road(new Vector2(x * 2 + 1, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c3)
+                roads.add(new Road(new Vector2(x * 2, y * 2 + 2), new Color(1, 0, 0, 1)));
+
+            if (!c4)
+                roads.add(new Road(new Vector2(x * 2 + 1, y * 2 + 2), new Color(1, 0, 0, 1)));
+        } else {
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 1, y * 2)))
+                    c1 = true;
+
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 2, y * 2)))
+                    c2 = true;
+
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 1, y * 2 + 2)))
+                    c3 = true;
+
+            for (Road road : roads)
+                if (road.getGridPos().equals(new Vector2(x * 2 + 2, y * 2 + 2)))
+                    c4 = true;
+
+            if (!c1)
+                roads.add(new Road(new Vector2(x * 2 + 1, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c2)
+                roads.add(new Road(new Vector2(x * 2 + 2, y * 2), new Color(1, 0, 0, 1)));
+
+            if (!c3)
+                roads.add(new Road(new Vector2(x * 2 + 1, y * 2 + 2), new Color(1, 0, 0, 1)));
+
+            if (!c4)
+                roads.add(new Road(new Vector2(x * 2 + 2, y * 2 + 2), new Color(1, 0, 0, 1)));
         }
+
+        for (Road road : roads)
+            if (road.getGridPos().equals(new Vector2(x, y * 2 + 1)))
+                c5 = true;
+
+        for (Road road : roads)
+            if (road.getGridPos().equals(new Vector2(x + 1, y * 2 + 1)))
+                c6 = true;
+
+        if (!c5)
+            roads.add(new Road(new Vector2(x, y * 2 + 1), new Color(1, 0, 0, 1)));
+
+        if (!c6)
+            roads.add(new Road(new Vector2(x + 1, y * 2 + 1), new Color(1, 0, 0, 1)));
+    }
+
+    private void handleSocketEvents() {
+        socket.on(Socket.EVENT_CONNECT, args -> {
+            Gdx.app.log("SocketIO", "Connected");
+        }).on("socketID", args -> {
+            JSONObject data = (JSONObject) args[0];
+            try {
+                String id = data.getString("id");
+                Gdx.app.log("SocketIO", "My ID: " + id);
+            } catch (JSONException e) {
+                Gdx.app.log("SocketIO", "Error retrieving ID");
+            }
+        }).on("newPlayer", args -> {
+            JSONObject data = (JSONObject) args[0];
+            try {
+                String id = data.getString("id");
+                Gdx.app.log("SocketIO", "New player connected; ID: " + id);
+            } catch (JSONException e) {
+                Gdx.app.log("SocketIO", "Error retrieving new player's ID");
+            }
+        }).on("playerList", args -> {
+            JSONObject data = (JSONObject) args[0];
+            try {
+                JSONArray playerList = data.getJSONArray("playerList");
+                Gdx.app.log("SocketIO", "Player list: " + playerList.toString());
+            } catch (JSONException e) {
+                Gdx.app.log("SocketIO", "Error retrieving player list");
+            }
+        }).on("playerLeft", args -> {
+            JSONObject data = (JSONObject) args[0];
+            try {
+                String id = data.getString("id");
+                Gdx.app.log("SocketIO", "A player disconnected; ID: " + id);
+            } catch (JSONException e) {
+                Gdx.app.log("SocketIO", "Error retrieving disconnected player's id");
+            }
+        }).on("gameInfo", message -> {
+            gameStarted = true;
+            Gdx.app.log("SocketIO", message[0].toString());
+        });
     }
 
     private void handleInput() {
@@ -183,22 +312,7 @@ class GameScreen implements Screen {
                             playingPlayer++;
                         }
                         break;
-                    case Input.Keys.A:
-                        String textToSend;
-
-                            textToSend = "Doesn't say much but likes clicking buttons\n";
-
-                        SocketHints socketHints = new SocketHints();
-                        // Socket will time our in 4 seconds
-                        socketHints.connectTimeout = 4000;
-                        //create the socket and connect to the server entered in the text box ( x.x.x.x format ) on port 9021
-                        Socket socket = Gdx.net.newClientSocket(Net.Protocol.TCP, "92.110.62.170", 9021, socketHints);
-                        try {
-                            // write our entered message to the stream
-                            socket.getOutputStream().write(textToSend.getBytes());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                    case Input.Keys.D:
                         break;
                 }
                 return true;
@@ -210,19 +324,29 @@ class GameScreen implements Screen {
                         for (Corner corner : corners) {
                             if (corner.contains(getMousePosInGame())) {
                                 if (noVisibleNeighbours(corner) && !corner.isVisible()) {
-                                    corner.setColor(players.get(playingPlayer).getColor());
-                                    corner.setVisible(true);
+                                    socket.emit("placeVillageRequest", x, y);
+                                    socket.on("placeVillage", args -> {
+                                        if ((Integer) args[0] == x && (Integer) args[1] == y) {
+                                            JSONObject players = (JSONObject) args[2];
+                                            try {
+                                                JSONObject currentPlayer = (JSONObject) players.get((String) args[3]);
+                                                corner.setColor(new Color((Integer) currentPlayer.get("color")));
+                                                corner.setVisible(true);
+                                            } catch (JSONException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    });
                                 }
                             }
                         }
 
                         for (Road road : roads) {
                             if (road.contains(getMousePosInGame()) && !road.isVisible()) {
-                                road.setColor(players.get(playingPlayer).getColor());
+                                road.setColor(Color.BLUE);
                                 road.setVisible(true);
                             }
                         }
-                        System.out.println("TEST");
                         break;
                 }
                 return true;
@@ -281,19 +405,21 @@ class GameScreen implements Screen {
             hexagon.draw(pSB);
         }
 
-        hoveredHexagon.draw(pSB);
+        if (hoveredHexagon != null)
+            hoveredHexagon.draw(pSB);
 
         for (Corner corner : corners) {
             corner.draw(pSB);
         }
-
-        hoveredCorner.draw(pSB);
+        if (hoveredCorner != null)
+            hoveredCorner.draw(pSB);
 
         for (Road road : roads) {
             road.draw(pSB);
         }
 
-        hoveredRoad.draw(pSB);
+        if (hoveredRoad != null)
+            hoveredRoad.draw(pSB);
 
         pSB.end();
 
@@ -311,16 +437,15 @@ class GameScreen implements Screen {
             }
         }
 
-        if (!cornerHovered) {
+        if (!cornerHovered && hoveredCorner != null) {
             hoveredCorner.setGridPos(new Vector2(-2, -2));
         }
 
-        if (!roadHovered) {
+        if (!roadHovered && hoveredRoad != null) {
             hoveredRoad.setGridPos(new Vector2(-2, -2));
         }
 
         for (Hexagon hexagon : tiles) {
-
             if (hexagon.contains(getMousePosInGame())) {
                 for (Corner corner : corners) {
                     if (corner.contains(getMousePosInGame())) {
@@ -335,7 +460,7 @@ class GameScreen implements Screen {
             }
         }
 
-        if (!hovering) {
+        if (!hovering && hoveredHexagon != null) {
             hoveredHexagon.setGridPos(new Vector2(-2, -2));
         }
     }

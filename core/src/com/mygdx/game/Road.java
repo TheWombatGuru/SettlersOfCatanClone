@@ -15,7 +15,7 @@ public class Road {
     private Texture texture;
     private Polygon rectangle;
     private boolean visible;
-    private float width = GameScreen.TILE_HEIGHT / 8 * 2, height = width / 6;
+    private float width = GameScreen.tileHeight / 8 * 2, height = width / 6;
     private float rotation;
 
     public Road(Vector2 gridPos, Color color) {
@@ -125,16 +125,16 @@ public class Road {
     }
 
     private Vector2 createPos(Vector2 gridPos) {
-        float yPos = GameScreen.TILE_HEIGHT / 8 - height / 2 + gridPos.y / 2 * GameScreen.TILE_HEIGHT / 4 * 3 + gridPos.y / 2 * GameScreen.TILE_MARGIN;
+        float yPos = GameScreen.tileHeight / 8 - height / 2 + gridPos.y / 2 * GameScreen.tileHeight / 4 * 3 + gridPos.y / 2 * GameScreen.TILE_MARGIN;
         float xPos;
         if (gridPos.y % 2 == 0) {
-            xPos = GameScreen.TILE_WIDTH / 4 - width / 2 + (GameScreen.TILE_WIDTH + GameScreen.TILE_MARGIN) * (gridPos.x / 2);
+            xPos = GameScreen.tileWidth / 4 - width / 2 + (GameScreen.tileWidth + GameScreen.TILE_MARGIN) * (gridPos.x / 2);
         } else {
-            xPos = -width / 2 + (GameScreen.TILE_WIDTH + GameScreen.TILE_MARGIN) * gridPos.x;
+            xPos = -width / 2 + (GameScreen.tileWidth + GameScreen.TILE_MARGIN) * gridPos.x;
         }
 
         if (gridPos.y % 4 == 3) {
-            xPos += GameScreen.TILE_WIDTH / 2;
+            xPos += GameScreen.tileWidth / 2;
         }
 
         return new Vector2(xPos, yPos);

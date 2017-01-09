@@ -1,52 +1,81 @@
 package com.mygdx.game;
 
-import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.PolygonRegion;
-import com.badlogic.gdx.graphics.g2d.PolygonSprite;
-import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.math.EarClippingTriangulator;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.Align;
 
 class Hexagon {
 
     private Color color;
     private PolygonSprite pSprite;
     private Vector2 gridPos;
-    private Texture texture;
+    private Texture hexagonTexture;
+    private TileType tileType;
+    private int tileNumber;
+    private Texture numberTexture;
+    private int pixmapSize = (int) GameScreen.tileWidth / 2;
+    private FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("Georgia.ttf"));
+    private FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
+    private BitmapFont font;
 
-    Hexagon(Color color, Vector2 gridPos) {
-        this.color = color;
+    Hexagon(TileType tileType, Vector2 gridPos, int tileNumber) {
+        this.tileType = tileType;
         this.gridPos = gridPos;
-        this.pSprite = createNewPolygon(color, gridPos);
+        this.hexagonTexture = createHexagonTexture();
+        this.pSprite = createNewPolygon(gridPos);
+        this.tileNumber = tileNumber;
+        createNumberTexture();
+        createFont();
+
     }
 
-    private PolygonSprite createNewPolygon(Color color, Vector2 gridPos) {
-        float tileSize = GameScreen.TILE_HEIGHT;
+    Hexagon(Color color, Vector2 gridPos, int tileNumber) {
+        this.gridPos = gridPos;
+        this.hexagonTexture = createHexagonTexture(color);
+        this.pSprite = createNewPolygon(gridPos);
+        this.tileNumber = tileNumber;
+        createNumberTexture();
+    }
 
-        if (color == TileType.WOOL.getColor()) {
-            texture = new Texture(Gdx.files.internal("wool.png"));
-        } else if (color == TileType.WOOD.getColor()) {
-            texture = new Texture(Gdx.files.internal("wood.png"));
-        } else if (color == TileType.STONE.getColor()) {
-            texture = new Texture(Gdx.files.internal("stone.png"));
-        } else if (color == TileType.ORE.getColor()) {
-            texture = new Texture(Gdx.files.internal("ore.png"));
-        } else if (color == TileType.WHEAT.getColor()) {
-            texture = new Texture(Gdx.files.internal("wheat.png"));
-        } else {
-            Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-            pix.setColor(color);
-            pix.fill();
-            texture = new Texture(pix);
-            pix.dispose();
-        }
+    private void createFont() {
+        parameter.size = pixmapSize / 10 * 4;
+        parameter.flip = true;
+        font = generator.generateFont(parameter);
+    }
 
-        float texHeight = texture.getHeight();
+    private void createNumberTexture() {
+        Pixmap pixmap = new Pixmap(pixmapSize, pixmapSize, Pixmap.Format.RGBA8888);
+        pixmap.setColor(new Color(0, 0, 0, .5f));
+        Pixmap.setBlending(Pixmap.Blending.None);
+        pixmap.fillCircle(pixmapSize / 2, pixmapSize / 2, pixmapSize / 10 * 4);
+        numberTexture = new Texture(pixmap);
+        pixmap.dispose();
+    }
+
+    private Texture createHexagonTexture() {
+        return tileType.getTexture();
+    }
+
+    private Texture createHexagonTexture(Color color) {
+        Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pix.setColor(color);
+        pix.fill();
+        hexagonTexture = new Texture(pix);
+        pix.dispose();
+        return hexagonTexture;
+    }
+
+    private PolygonSprite createNewPolygon(Vector2 gridPos) {
+        float tileSize = GameScreen.tileHeight;
+
+        float texHeight = hexagonTexture.getHeight();
         float texWidth = texHeight * ((float) Math.sqrt(3) / 2);
 
         Vector2 start = getGridCoords(gridPos);
@@ -59,7 +88,7 @@ class Hexagon {
                 0, texHeight * .75f,
                 0, texHeight * .25f};
 
-        TextureRegion textureRegion = new TextureRegion(texture);
+        TextureRegion textureRegion = new TextureRegion(hexagonTexture);
         textureRegion.flip(false, true);
         PolygonRegion polyRegion = new PolygonRegion(textureRegion, vertices, new EarClippingTriangulator().computeTriangles(vertices).toArray());
         PolygonSprite pSprite = new PolygonSprite(polyRegion);
@@ -69,8 +98,8 @@ class Hexagon {
     }
 
     Vector2 getGridCoords(Vector2 gridPos) {
-        float tileWidth = GameScreen.TILE_WIDTH;
-        float tileHeight = GameScreen.TILE_HEIGHT;
+        float tileWidth = GameScreen.tileWidth;
+        float tileHeight = GameScreen.tileHeight;
 
         float xStart = gridPos.x * tileWidth + (gridPos.y % 2 == 1 ? tileWidth / 2 : 0) + gridPos.x * GameScreen.TILE_MARGIN + (gridPos.y % 2 == 1 ? GameScreen.TILE_MARGIN / 2 : 0);
         float yStart = gridPos.y * (tileHeight * .75f) + gridPos.y * GameScreen.TILE_MARGIN;
@@ -96,6 +125,12 @@ class Hexagon {
 
     void draw(PolygonSpriteBatch pSB) {
         this.pSprite.draw(pSB);
+
+        if (tileNumber != 0) {
+            pSB.draw(numberTexture, pSprite.getX() + GameScreen.tileWidth / 2 - pixmapSize / 2, pSprite.getY() + GameScreen.tileHeight / 2 - pixmapSize / 2);
+            font.setColor(Color.WHITE);
+            font.draw(pSB, Integer.toString(tileNumber), pSprite.getX() + GameScreen.tileWidth / 2 - pixmapSize / 2, pSprite.getY() + GameScreen.tileHeight / 2 - font.getLineHeight() / 2, (float) pixmapSize, Align.center, false);
+        }
     }
 
     boolean contains(float x, float y) {
@@ -142,6 +177,7 @@ class Hexagon {
     }
 
     void dispose() {
-        texture.dispose();
+        hexagonTexture.dispose();
+        numberTexture.dispose();
     }
 }

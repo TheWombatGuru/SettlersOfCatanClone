@@ -13,7 +13,7 @@ class Corner {
     private Vector2 pos, gridPos;
     private Texture texture;
     private Circle circle;
-    private final int pixmapSize = (int) GameScreen.TILE_WIDTH / 4;
+    private final int pixmapSize = (int) GameScreen.tileWidth / 4;
     private Color color;
     private boolean visible;
 
@@ -24,7 +24,7 @@ class Corner {
         this.visible = false;
         createTexture();
 
-        circle = new Circle(pos.x + pixmapSize / 2, pos.y + pixmapSize / 2, 20);
+        circle = new Circle(pos.x + pixmapSize / 2, pos.y + pixmapSize / 2, pixmapSize / 10 * 4);
     }
 
     Corner (Vector2 gridPos, Color color, boolean visible) {
@@ -42,8 +42,8 @@ class Corner {
     }
 
     private Vector2 createPos(Vector2 gridPos) {
-        int posX = (int) (gridPos.x * GameScreen.TILE_MARGIN + gridPos.x * GameScreen.TILE_WIDTH + ((gridPos.y + 3) % 4 >= 2 ? GameScreen.TILE_WIDTH / 2 : 0) - pixmapSize / 2);
-        int posY = (int) (gridPos.y * GameScreen.TILE_HEIGHT / 4 + ((gridPos.y + 0) % 4 >= 2 ? GameScreen.TILE_HEIGHT / 4 : 0) + Math.floor(gridPos.y / 4) * GameScreen.TILE_HEIGHT / 2);
+        int posX = (int) (gridPos.x * GameScreen.TILE_MARGIN + gridPos.x * GameScreen.tileWidth + ((gridPos.y + 3) % 4 >= 2 ? GameScreen.tileWidth / 2 : 0) - pixmapSize / 2);
+        int posY = (int) (gridPos.y * GameScreen.tileHeight / 4 + ((gridPos.y + 0) % 4 >= 2 ? GameScreen.tileHeight / 4 : 0) + Math.floor(gridPos.y / 4) * GameScreen.tileHeight / 2);
         posY -= pixmapSize / 2;
         posY += gridPos.y * GameScreen.TILE_MARGIN / 2;
         return new Vector2(posX, posY);
